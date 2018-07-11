@@ -1,8 +1,13 @@
-from telegram.ext import Updater
-from telegram.ext import CommandHandler, MessageHandler, Filters, InlineQueryHandler,CallbackQueryHandler
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, KeyboardButton, InlineKeyboardMarkup,ReplyKeyboardMarkup
-import logging
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
+from telegram.ext import Updater
+from telegram.ext import CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
+from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, \
+KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+
+from emoji import emojize
+import logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
@@ -10,19 +15,25 @@ logging.basicConfig(
 updater = Updater(token='533092604:AAHByyEuPVgWApg6z5oRNzIJMiQvxtuGMY8')
 dispatcher = updater.dispatcher
 
-HOT = range(5)
+
+def status(bot, update):
+    pass
+
 
 def start(bot, update):
+
     bot.send_message(
-        chat_id=update.message.chat_id, text="I'm a bot, please talk to me!")
+        chat_id=update.message.chat_id,
+        text=emojize(
+            "I'm a bot, please talk to me!:stuck_out_tongue_closed_eyes:",
+            use_aliases=True))
 
 
 def list(bot, update):
-    reply_keyboard = [['ithome'], ['freebuf'], ['blog']]
+    reply_keyboard = [['hot'], ['new'], ['random'], ['my']]
 
     update.message.reply_text(
-        'Please pick a feed',
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+        'Please pick a feed', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
 
 
 def button(bot, update):
@@ -50,7 +61,16 @@ def chose(bot, update):
 
 
 def echo(bot, update):
-    bot.send_message(chat_id=update.message.chat_id, text=update.message.text)
+    bot.send_message(
+        chat_id=update.message.chat_id, text="Can't find command. Try /list.")
+
+
+def export(bot, uodate):
+    pass
+
+
+def import_feeds(bot, uodate):
+    pass
 
 
 def caps(bot, update, args):
@@ -62,25 +82,28 @@ def inline_caps(bot, update):
     query = update.inline_query.query
     if not query:
         return
-    result = list()
-    result.append(
+    results = list()
+    results.append(
         InlineQueryResultArticle(
             id=query.upper(),
             title='caps',
             input_message_content=InputTextMessageContent(query.upper())))
-    bot.answer_inline_query(update.inline_query.id, result)
+    bot.answer_inline_query(update.inline_query.id, results)
 
 
-updater.dispatcher.add_handler(CallbackQueryHandler(button))
-updater.dispatcher.add_handler(CommandHandler('help', help))
-updater.dispatcher.add_handler(CommandHandler('chose', chose))
-updater.dispatcher.add_handler(CommandHandler('list', list))
 start_handler = CommandHandler('start', start)
 echo_handler = MessageHandler(Filters.text, echo)
 caps_handler = CommandHandler('caps', caps, pass_args=True)
 inline_query_handler = InlineQueryHandler(inline_caps)
+
+dispatcher.add_handler(CallbackQueryHandler(button))
+dispatcher.add_handler(CommandHandler('help', help))
+dispatcher.add_handler(CommandHandler('chose', chose))
+dispatcher.add_handler(CommandHandler('list', list))
 dispatcher.add_handler(start_handler)
 dispatcher.add_handler(echo_handler)
-dispatcher.add_handler(caps_handler)
-dispatcher.add_handler(inline_query_handler)
+# dispatcher.add_handler(caps_handler)
+# dispatcher.add_handler(inline_query_handler)
+
 updater.start_polling()
+updater.idle()
