@@ -8,6 +8,8 @@ KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 from emoji import emojize
 import logging
+import json
+import requests
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
@@ -15,9 +17,11 @@ logging.basicConfig(
 updater = Updater(token='533092604:AAHByyEuPVgWApg6z5oRNzIJMiQvxtuGMY8')
 dispatcher = updater.dispatcher
 
+IP = '127.0.0.1'
+DOMAIN = ''
+PORT = 4000
 
-def status(bot, update):
-    pass
+HOST = (DOMAIN or IP) + ':' + str(PORT)
 
 
 def start(bot, update):
@@ -25,15 +29,84 @@ def start(bot, update):
     bot.send_message(
         chat_id=update.message.chat_id,
         text=emojize(
-            "I'm a bot, please talk to me!:stuck_out_tongue_closed_eyes:",
+            "Welcome! Try /list to get feed. :stuck_out_tongue_closed_eyes:",
             use_aliases=True))
 
 
-def list(bot, update):
-    reply_keyboard = [['hot'], ['new'], ['random'], ['my']]
+def status(bot, update):
+    pass
+
+
+def list_feeds(bot, update):
+    reply_keyboard = list()
+    r = requests.get(HOST + '/api/feeds/')
+    feeds = json.loads(r)
+    if len(feeds) <= 0:
+        return
+    for feed in feeds:
+        reply_keyboard.append([feed.title])
+
+    # reply_keyboard = [['hot'], ['new'], ['random'], ['my']]
 
     update.message.reply_text(
         'Please pick a feed', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+
+
+def help(bot, update):
+    update.message.reply_text("Use /start to test this bot.")
+
+
+def echo(bot, update):
+    # msg = update.message.text
+    # if msg == 'new':
+    #     pass
+    # elif msg == 'random':
+    #     pass
+    # elif msg == 'hot':
+    #     pass
+    # elif msg == 'my':
+    #     pass
+    # else:
+    text = "Can't find command. Try /list."
+    bot.send_message(chat_id=update.message.chat_id, text=text)
+
+
+def hot(bot, update):
+    r = requests.get(HOST + '/api/items/hot/5')
+    items = json.loads(r)
+    links = list()
+    for item in items:
+        link = HOST + '/items/path'
+        links.append(link)
+    bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
+
+
+def random(bot, update):
+    r = requests.get(HOST + '/api/items/random/5')
+    items = json.loads(r)
+    links = list()
+    for item in items:
+        link = HOST + '/items/path'
+        links.append(link)
+    bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
+
+
+def new(bot, update):
+    r = requests.get(HOST + '/api/items/new/5')
+    items = json.loads(r)
+    links = list()
+    for item in items:
+        link = HOST + '/items/path'
+        links.append(link)
+    bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
+
+
+def export(bot, uodate):
+    pass
+
+
+def import_feeds(bot, uodate):
+    pass
 
 
 def button(bot, update):
@@ -45,10 +118,6 @@ def button(bot, update):
         message_id=query.message.message_id)
 
 
-def help(bot, update):
-    update.message.reply_text("Use /start to test this bot.")
-
-
 def chose(bot, update):
     keyboard = [[
         InlineKeyboardButton("Option 1", callback_data='1'),
@@ -58,19 +127,6 @@ def chose(bot, update):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.message.reply_text('Please choose:', reply_markup=reply_markup)
-
-
-def echo(bot, update):
-    bot.send_message(
-        chat_id=update.message.chat_id, text="Can't find command. Try /list.")
-
-
-def export(bot, uodate):
-    pass
-
-
-def import_feeds(bot, uodate):
-    pass
 
 
 def caps(bot, update, args):
@@ -93,15 +149,18 @@ def inline_caps(bot, update):
 
 start_handler = CommandHandler('start', start)
 echo_handler = MessageHandler(Filters.text, echo)
-caps_handler = CommandHandler('caps', caps, pass_args=True)
-inline_query_handler = InlineQueryHandler(inline_caps)
+# caps_handler = CommandHandler('caps', caps, pass_args=True)
+# inline_query_handler = InlineQueryHandler(inline_caps)
 
 dispatcher.add_handler(CallbackQueryHandler(button))
 dispatcher.add_handler(CommandHandler('help', help))
-dispatcher.add_handler(CommandHandler('chose', chose))
-dispatcher.add_handler(CommandHandler('list', list))
+dispatcher.add_handler(CommandHandler('list', list_feeds))
+dispatcher.add_handler(CommandHandler('hot', hot))
+dispatcher.add_handler(CommandHandler('new', new))
+dispatcher.add_handler(CommandHandler('random', hot))
 dispatcher.add_handler(start_handler)
 dispatcher.add_handler(echo_handler)
+# dispatcher.add_handler(CommandHandler('chose', chose))
 # dispatcher.add_handler(caps_handler)
 # dispatcher.add_handler(inline_query_handler)
 
