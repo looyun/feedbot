@@ -26,6 +26,11 @@ HOST = (DOMAIN or IP) + ':' + str(PORT)
 user_token_dict = dict()
 
 
+def request_with_token(token, url):
+    headers = {"Authorization": token}
+    return request.get(url, headers=headers)
+
+
 def start(bot, update):
 
     bot.send_message(
@@ -58,43 +63,17 @@ def help(bot, update):
     update.message.reply_text("Use /start to test this bot.")
 
 
-def echo(bot, update):
-    # msg = update.message.text
-    # if msg == 'new':
-    #     pass
-    # elif msg == 'random':
-    #     pass
-    # elif msg == 'hot':
-    #     pass
-    # elif msg == 'my':
-    #     pass
-    # else:
-    text = "Can't find command. Try /list."
+def add_token(bot, update, args):
+    token = args[0]
+    user_id = update.message.from_user.id
+    user_name = update.message.from_user.full_name
+    user_token_dict[user_name] = token
+    text = emojize(":ok_hand:", use_aliases=True)
     bot.send_message(chat_id=update.message.chat_id, text=text)
 
 
 def hot(bot, update):
     r = requests.get(HOST + '/api/items/hot/5')
-    items = json.loads(r)
-    links = list()
-    for item in items:
-        link = HOST + '/items/path'
-        links.append(link)
-    bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
-
-
-def random(bot, update):
-    r = requests.get(HOST + '/api/items/random/5')
-    items = json.loads(r)
-    links = list()
-    for item in items:
-        link = HOST + '/items/path'
-        links.append(link)
-    bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
-
-
-def new(bot, update):
-    r = requests.get(HOST + '/api/items/new/5')
     items = json.loads(r)
     links = list()
     for item in items:
@@ -151,7 +130,7 @@ def inline_caps(bot, update):
 
 if __name__ == "__main__":
     start_handler = CommandHandler('start', start)
-    echo_handler = MessageHandler(Filters.text, echo)
+    add_token_handler = CommandHandler("add_token", add_token, pass_args=True)
     # caps_handler = CommandHandler('caps', caps, pass_args=True)
     # inline_query_handler = InlineQueryHandler(inline_caps)
 
@@ -159,10 +138,8 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('help', help))
     dispatcher.add_handler(CommandHandler('list', list_feeds))
     dispatcher.add_handler(CommandHandler('hot', hot))
-    dispatcher.add_handler(CommandHandler('new', new))
-    dispatcher.add_handler(CommandHandler('random', hot))
     dispatcher.add_handler(start_handler)
-    dispatcher.add_handler(echo_handler)
+    dispatcher.add_handler(add_token_handler)
     # dispatcher.add_handler(CommandHandler('chose', chose))
     # dispatcher.add_handler(caps_handler)
     # dispatcher.add_handler(inline_query_handler)
