@@ -4,7 +4,7 @@
 from telegram.ext import Updater
 from telegram.ext import CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
 from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, \
-KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+    KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 from emoji import emojize
 import logging
@@ -14,7 +14,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
 
-updater = Updater(token='533092604:AAHByyEuPVgWApg6z5oRNzIJMiQvxtuGMY8')
+updater = Updater(token='533092604:AAGjcs5aOhjIvqM7-SJEuho2_64FsKhPXu0')
 dispatcher = updater.dispatcher
 
 IP = '127.0.0.1'
@@ -22,6 +22,8 @@ DOMAIN = ''
 PORT = 4000
 
 HOST = (DOMAIN or IP) + ':' + str(PORT)
+
+user_token_dict = dict()
 
 
 def start(bot, update):
@@ -147,22 +149,23 @@ def inline_caps(bot, update):
     bot.answer_inline_query(update.inline_query.id, results)
 
 
-start_handler = CommandHandler('start', start)
-echo_handler = MessageHandler(Filters.text, echo)
-# caps_handler = CommandHandler('caps', caps, pass_args=True)
-# inline_query_handler = InlineQueryHandler(inline_caps)
+if __name__ == "__main__":
+    start_handler = CommandHandler('start', start)
+    echo_handler = MessageHandler(Filters.text, echo)
+    # caps_handler = CommandHandler('caps', caps, pass_args=True)
+    # inline_query_handler = InlineQueryHandler(inline_caps)
 
-dispatcher.add_handler(CallbackQueryHandler(button))
-dispatcher.add_handler(CommandHandler('help', help))
-dispatcher.add_handler(CommandHandler('list', list_feeds))
-dispatcher.add_handler(CommandHandler('hot', hot))
-dispatcher.add_handler(CommandHandler('new', new))
-dispatcher.add_handler(CommandHandler('random', hot))
-dispatcher.add_handler(start_handler)
-dispatcher.add_handler(echo_handler)
-# dispatcher.add_handler(CommandHandler('chose', chose))
-# dispatcher.add_handler(caps_handler)
-# dispatcher.add_handler(inline_query_handler)
+    dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(CommandHandler('help', help))
+    dispatcher.add_handler(CommandHandler('list', list_feeds))
+    dispatcher.add_handler(CommandHandler('hot', hot))
+    dispatcher.add_handler(CommandHandler('new', new))
+    dispatcher.add_handler(CommandHandler('random', hot))
+    dispatcher.add_handler(start_handler)
+    dispatcher.add_handler(echo_handler)
+    # dispatcher.add_handler(CommandHandler('chose', chose))
+    # dispatcher.add_handler(caps_handler)
+    # dispatcher.add_handler(inline_query_handler)
 
-updater.start_polling()
-updater.idle()
+    updater.start_polling()
+    updater.idle()
