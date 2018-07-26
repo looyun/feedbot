@@ -6,6 +6,7 @@ from telegram.ext import CommandHandler, MessageHandler, Filters, InlineQueryHan
 from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, \
     KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
+from functools import partial
 from emoji import emojize
 import logging
 import json
@@ -26,9 +27,8 @@ HOST = (DOMAIN or IP) + ':' + str(PORT)
 user_token_dict = dict()
 
 
-def request_with_token(token, url):
-    headers = {"Authorization": token}
-    return request.get(url, headers=headers)
+def get_auth_headers(token):
+    return {"Authorization": token}
 
 
 def start(bot, update):
@@ -41,22 +41,68 @@ def start(bot, update):
 
 
 def status(bot, update):
-    pass
+    bot.send_message(
+        chat_id=update.message.chat_id,
+        text=emojize(
+            "Feeds %d, unread items %d, star items %d. :stuck_out_tongue_closed_eyes:" % (
+                10, 50, 5),
+            use_aliases=True))
 
 
-def list_feeds(bot, update):
-    reply_keyboard = list()
-    r = requests.get(HOST + '/api/feeds/')
-    feeds = json.loads(r)
-    if len(feeds) <= 0:
-        return
-    for feed in feeds:
-        reply_keyboard.append([feed.title])
-
-    # reply_keyboard = [['hot'], ['new'], ['random'], ['my']]
-
+def my(bot, update):
+    user_id = update.message.from_user.id
+    token = user_token_dict.get(user_id)
+    reply_keyboard = [['feeds'], ['items'], ['stars'], ['status']]
     update.message.reply_text(
-        'Please pick a feed', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+        'Your feed:', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+
+
+def echo(bot, update):
+    msg = update.message.text
+    user_id = update.message.from_user.id
+    token = user_token_dict.get(user_id)
+    headers = get_auth_headers(token)
+
+    if msg == 'feeds':
+        request_url = HOST + '/api/my/feeds'
+        r = requests.get(request_url, headers=headers)
+
+        if r.status_code == 200:
+            items = json.loads(r)
+            names = list()
+            for item in items:
+                name = item.get('title')
+                names.append(name)
+            text = emojize('\n'.join(names) + "\n:ok_hand:", use_aliases=True)
+        else:
+            text = emojize("failed:slightly_frowning_face:", use_aliases=True)
+        bot.send_message(chat_id=update.message.chat_id, text=text)
+        return
+    elif msg == 'items':
+        request_url = HOST + '/api/my/items'
+    elif msg == 'stars':
+        request_url = HOST + '/api/my/stars'
+    elif msg == 'status':
+        bot.send_message(
+            chat_id=update.message.chat_id,
+            text=emojize(
+                "Feeds %d, unread items %d, star items %d. :stuck_out_tongue_closed_eyes:" % (
+                    10, 50, 5),
+                use_aliases=True))
+        return
+
+    r = requests.get(request_url, headers=headers)
+
+    if r.status_code == 200:
+        items = json.loads(r)
+        links = list()
+        for item in items:
+            link = HOST + '/item/' + item.get('link')
+            links.append(link)
+            text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
+    else:
+        text = emojize("failed:slightly_frowning_face:", use_aliases=True)
+    bot.send_message(chat_id=update.message.chat_id, text=text)
 
 
 def help(bot, update):
@@ -66,9 +112,23 @@ def help(bot, update):
 def add_token(bot, update, args):
     token = args[0]
     user_id = update.message.from_user.id
-    user_name = update.message.from_user.full_name
-    user_token_dict[user_name] = token
+    user_token_dict[user_id] = token
     text = emojize(":ok_hand:", use_aliases=True)
+    bot.send_message(chat_id=update.message.chat_id, text=text)
+
+
+def subscribe(bot, update, args):
+    feedurl = args[0]
+    user_id = update.message.from_user.id
+    token = user_token_dict.get(user_id)
+    payload = {"feedurl": feedurl}
+    request_url = HOST + '/api/my/subscribe'
+    headers = get_auth_headers(token)
+    r = requests.post(request_url, data=payload, headers=headers)
+    if r.status_code == 200:
+        text = emojize(":ok_hand:", use_aliases=True)
+    else:
+        text = emojize("failed:slightly_frowning_face:", use_aliases=True)
     bot.send_message(chat_id=update.message.chat_id, text=text)
 
 
@@ -129,20 +189,21 @@ def inline_caps(bot, update):
 
 
 if __name__ == "__main__":
-    start_handler = CommandHandler('start', start)
-    add_token_handler = CommandHandler("add_token", add_token, pass_args=True)
-    # caps_handler = CommandHandler('caps', caps, pass_args=True)
-    # inline_query_handler = InlineQueryHandler(inline_caps)
 
-    dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(CommandHandler('start', start))
     dispatcher.add_handler(CommandHandler('help', help))
-    dispatcher.add_handler(CommandHandler('list', list_feeds))
-    dispatcher.add_handler(CommandHandler('hot', hot))
-    dispatcher.add_handler(start_handler)
-    dispatcher.add_handler(add_token_handler)
+    dispatcher.add_handler(CommandHandler('status', status))
+    dispatcher.add_handler(CommandHandler('my', my))
+    # dispatcher.add_handler(CommandHandler('hot', hot))
+    dispatcher.add_handler(MessageHandler(Filters.text, echo))
+    dispatcher.add_handler(CommandHandler(
+        "add_token", add_token, pass_args=True))
+    dispatcher.add_handler(CommandHandler(
+        "subscribe", subscribe, pass_args=True))
+    # dispatcher.add_handler(CallbackQueryHandler(button))
     # dispatcher.add_handler(CommandHandler('chose', chose))
-    # dispatcher.add_handler(caps_handler)
-    # dispatcher.add_handler(inline_query_handler)
+    # dispatcher.add_handler(CommandHandler('caps', caps, pass_args=True))
+    # dispatcher.add_handler(InlineQueryHandler(inline_caps))
 
     updater.start_polling()
     updater.idle()
