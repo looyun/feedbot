@@ -18,7 +18,7 @@ logging.basicConfig(
 updater = Updater(token='533092604:AAGjcs5aOhjIvqM7-SJEuho2_64FsKhPXu0')
 dispatcher = updater.dispatcher
 
-HOST = '127.0.0.1'
+HOST = '149.28.144.135'
 DOMAIN = ''
 PORT = 4000
 SCHEMA = 'http://'
@@ -68,10 +68,10 @@ def echo(bot, update):
         r = requests.get(request_url, headers=headers)
 
         if r.status_code == 200:
-            items = json.loads(r)
+            items = r.json()
             names = list()
             for item in items:
-                name = item.get('title')
+                name = item.get('Title')
                 names.append(name)
             text = emojize('\n'.join(names) + "\n:ok_hand:", use_aliases=True)
         else:
@@ -94,10 +94,10 @@ def echo(bot, update):
     r = requests.get(request_url, headers=headers)
 
     if r.status_code == 200:
-        items = json.loads(r)
+        items = r.json()
         links = list()
         for item in items:
-            link = URL + '/item/' + item.get('link')
+            link = URL + '/item/' + item.get('Link')
             links.append(link)
             text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
     else:
@@ -133,11 +133,11 @@ def subscribe(bot, update, args):
 
 
 def hot(bot, update):
-    r = requests.get(URL + '/api/items/hot/5')
-    items = json.loads(r)
+    r = requests.get(URL + '/api/items/recommand/5')
+    items = r.json()
     links = list()
     for item in items:
-        link = URL + '/items/path'
+        link = URL + '/api/item/' + item.get("Link")
         links.append(link)
     bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
 
