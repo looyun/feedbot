@@ -18,11 +18,11 @@ logging.basicConfig(
 updater = Updater(token='533092604:AAGjcs5aOhjIvqM7-SJEuho2_64FsKhPXu0')
 dispatcher = updater.dispatcher
 
-IP = '127.0.0.1'
+HOST = '127.0.0.1'
 DOMAIN = ''
 PORT = 4000
-
-HOST = (DOMAIN or IP) + ':' + str(PORT)
+SCHEMA = 'http://'
+URL = SCHEMA + (DOMAIN or HOST) + ':' + str(PORT)
 
 user_token_dict = dict()
 
@@ -64,7 +64,7 @@ def echo(bot, update):
     headers = get_auth_headers(token)
 
     if msg == 'feeds':
-        request_url = HOST + '/api/my/feeds'
+        request_url = URL + '/api/my/feeds'
         r = requests.get(request_url, headers=headers)
 
         if r.status_code == 200:
@@ -79,9 +79,9 @@ def echo(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text=text)
         return
     elif msg == 'items':
-        request_url = HOST + '/api/my/items'
+        request_url = URL + '/api/my/items'
     elif msg == 'stars':
-        request_url = HOST + '/api/my/stars'
+        request_url = URL + '/api/my/stars'
     elif msg == 'status':
         bot.send_message(
             chat_id=update.message.chat_id,
@@ -97,7 +97,7 @@ def echo(bot, update):
         items = json.loads(r)
         links = list()
         for item in items:
-            link = HOST + '/item/' + item.get('link')
+            link = URL + '/item/' + item.get('link')
             links.append(link)
             text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
     else:
@@ -122,7 +122,7 @@ def subscribe(bot, update, args):
     user_id = update.message.from_user.id
     token = user_token_dict.get(user_id)
     payload = {"feedurl": feedurl}
-    request_url = HOST + '/api/my/subscribe'
+    request_url = URL + '/api/my/subscribe'
     headers = get_auth_headers(token)
     r = requests.post(request_url, data=payload, headers=headers)
     if r.status_code == 200:
@@ -133,11 +133,11 @@ def subscribe(bot, update, args):
 
 
 def hot(bot, update):
-    r = requests.get(HOST + '/api/items/hot/5')
+    r = requests.get(URL + '/api/items/hot/5')
     items = json.loads(r)
     links = list()
     for item in items:
-        link = HOST + '/items/path'
+        link = URL + '/items/path'
         links.append(link)
     bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
 
