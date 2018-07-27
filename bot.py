@@ -163,7 +163,7 @@ def callback(bot, update):
     user_id = update.callback_query.from_user.id
     token = user_token_dict.get(user_id)
     headers = get_auth_headers(token)
-    request_url = URL + '/api/my/items' + '?page=1&per_page=10'
+    request_url = URL + '/api/my/items' + '?page=%s&per_page=10' %page
     r = requests.get(request_url, headers=headers)
 
     if r.status_code == 200:
