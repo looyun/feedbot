@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from telegram.ext import Updater
-from telegram.ext import CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, \
-    KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
-
-from functools import partial
-from emoji import emojize
-import logging
 import json
+import logging
+from functools import partial
+
 import requests
+from emoji import emojize
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
+                      InlineQueryResultArticle, InputTextMessageContent,
+                      KeyboardButton, ReplyKeyboardMarkup)
+from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
+                          InlineQueryHandler, MessageHandler, Updater)
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
@@ -50,8 +52,6 @@ def status(bot, update):
 
 
 def my(bot, update):
-    user_id = update.message.from_user.id
-    token = user_token_dict.get(user_id)
     reply_keyboard = [['feeds'], ['items'], ['stars'], ['status']]
     update.message.reply_text(
         'Your feed:', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
@@ -91,18 +91,21 @@ def echo(bot, update):
                 use_aliases=True))
         return
 
-    r = requests.get(request_url, headers=headers)
+    r = requests.get(request_url + '?page=1&per_page=10', headers=headers)
 
     if r.status_code == 200:
         items = r.json()
         links = list()
         for item in items:
-            link = URL + '/item/' + item.get('Link')
+            link = URL + '/api/item/' + str(item.get('ID'))
             links.append(link)
             text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
     else:
         text = emojize("failed:slightly_frowning_face:", use_aliases=True)
-    bot.send_message(chat_id=update.message.chat_id, text=text)
+
+    reply_markup = get_page_reply_markup(1)
+
+    update.message.reply_text(text, reply_markup=reply_markup)
 
 
 def help(bot, update):
@@ -150,24 +153,46 @@ def import_feeds(bot, uodate):
     pass
 
 
-def button(bot, update):
+def callback(bot, update):
     query = update.callback_query
 
+    page = int(query.data)
+    if page < 1:
+        return
+
+    user_id = update.callback_query.from_user.id
+    token = user_token_dict.get(user_id)
+    headers = get_auth_headers(token)
+    request_url = URL + '/api/my/items' + '?page=1&per_page=10'
+    r = requests.get(request_url, headers=headers)
+
+    if r.status_code == 200:
+        items = r.json()
+        links = list()
+        print(items[0])
+        for item in items:
+            link = URL + '/api/item/' + str(item.get('ID'))
+            links.append(link)
+            text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
+    else:
+        text = emojize("failed:slightly_frowning_face:", use_aliases=True)
+
+    reply_markup = get_page_reply_markup(page)
     bot.edit_message_text(
-        text="Selected option: {}".format(query.data),
+        text=text,
         chat_id=query.message.chat_id,
-        message_id=query.message.message_id)
+        message_id=query.message.message_id, reply_markup=reply_markup)
 
 
-def chose(bot, update):
+def get_page_reply_markup(page):
+
     keyboard = [[
-        InlineKeyboardButton("Option 1", callback_data='1'),
-        InlineKeyboardButton("Option 2", callback_data='2')
-    ], [InlineKeyboardButton("Option 3", callback_data='3')]]
+        InlineKeyboardButton("Last page", callback_data=page - 1),
+        InlineKeyboardButton("Page %s" % page, callback_data=page),
+        InlineKeyboardButton("Next page", callback_data=page + 1)
+    ]]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    update.message.reply_text('Please choose:', reply_markup=reply_markup)
+    return InlineKeyboardMarkup(keyboard)
 
 
 def caps(bot, update, args):
@@ -200,7 +225,7 @@ if __name__ == "__main__":
         "add_token", add_token, pass_args=True))
     dispatcher.add_handler(CommandHandler(
         "subscribe", subscribe, pass_args=True))
-    # dispatcher.add_handler(CallbackQueryHandler(button))
+    dispatcher.add_handler(CallbackQueryHandler(callback))
     # dispatcher.add_handler(CommandHandler('chose', chose))
     # dispatcher.add_handler(CommandHandler('caps', caps, pass_args=True))
     # dispatcher.add_handler(InlineQueryHandler(inline_caps))
