@@ -54,7 +54,7 @@ def status(bot, update):
 def my(bot, update):
     reply_keyboard = [['feeds'], ['items'], ['stars'], ['status']]
     update.message.reply_text(
-        'Your feed:', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
+        'Your choice:', reply_markup=ReplyKeyboardMarkup(reply_keyboard))
 
 
 def echo(bot, update):
@@ -71,7 +71,7 @@ def echo(bot, update):
             items = r.json()
             names = list()
             for item in items:
-                name = item.get('Title')
+                name = item.get('title')
                 names.append(name)
             text = emojize('\n'.join(names) + "\n:ok_hand:", use_aliases=True)
         else:
@@ -97,8 +97,11 @@ def echo(bot, update):
         items = r.json()
         links = list()
         for item in items:
-            link = URL + '/api/item/' + str(item.get('ID'))
+            link = URL + '/api/item/' + str(item.get('_id'))
             links.append(link)
+        if len(links) == 0:
+            text = emojize("no data:slightly_frowning_face:", use_aliases=True)
+        else:
             text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
     else:
         text = emojize("failed:slightly_frowning_face:", use_aliases=True)
@@ -140,7 +143,7 @@ def hot(bot, update):
     items = r.json()
     links = list()
     for item in items:
-        link = URL + '/api/item/' + item.get("Link")
+        link = URL + '/api/item/' + item.get("link")
         links.append(link)
     bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
 
@@ -156,6 +159,9 @@ def import_feeds(bot, uodate):
 def callback(bot, update):
     query = update.callback_query
 
+    print(query.data)
+    if query.data == 'current_page':
+        return
     page = int(query.data)
     if page < 1:
         return
@@ -163,16 +169,18 @@ def callback(bot, update):
     user_id = update.callback_query.from_user.id
     token = user_token_dict.get(user_id)
     headers = get_auth_headers(token)
-    request_url = URL + '/api/my/items' + '?page=%s&per_page=10' %page
+    request_url = URL + '/api/my/items' + '?page=%s&per_page=10' % page
     r = requests.get(request_url, headers=headers)
 
     if r.status_code == 200:
         items = r.json()
         links = list()
-        print(items[0])
         for item in items:
-            link = URL + '/api/item/' + str(item.get('ID'))
+            link = URL + '/api/item/' + str(item.get('_id'))
             links.append(link)
+        if len(links) == 0:
+            text = emojize("no data:slightly_frowning_face:", use_aliases=True)
+        else:
             text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
     else:
         text = emojize("failed:slightly_frowning_face:", use_aliases=True)
@@ -182,13 +190,15 @@ def callback(bot, update):
         text=text,
         chat_id=query.message.chat_id,
         message_id=query.message.message_id, reply_markup=reply_markup)
+    print('finished')
+    return
 
 
 def get_page_reply_markup(page):
 
     keyboard = [[
         InlineKeyboardButton("Last page", callback_data=page - 1),
-        InlineKeyboardButton("Page %s" % page, callback_data=page),
+        InlineKeyboardButton("Page %s" % page, callback_data='current_page'),
         InlineKeyboardButton("Next page", callback_data=page + 1)
     ]]
 
