@@ -3,6 +3,7 @@
 
 import json
 import logging
+import sqlite3
 import traceback
 from datetime import time
 from functools import partial
@@ -27,7 +28,8 @@ logging.basicConfig(
     level=logging.INFO)
 
 telegraph = Telegraph()
-telegraph.create_account(short_name='feedall', author_name='feedall')
+telegraph.create_account(
+    short_name='feedall', author_name='feedall', author_url='https://t.me/Gofeedbot')
 
 updater = Updater(token='533092604:AAGjcs5aOhjIvqM7-SJEuho2_64FsKhPXu0')
 dispatcher = updater.dispatcher
@@ -38,8 +40,6 @@ PORT = 4000
 SCHEMA = 'http://'
 URL = SCHEMA + (DOMAIN or HOST) + ':' + str(PORT)
 
-user_token_dict = dict()
-
 
 def get_auth_headers(token):
     return {"Authorization": token}
@@ -48,6 +48,12 @@ def get_auth_headers(token):
 def get_instant_view_links(items):
     links = list()
     for item in items:
+        id = item.get('_id')
+        link = get_link(id)
+        if link:
+            links.append(link)
+            continue
+
         html_content = item.get('content') or item.get('description')
         try:
             soup = BeautifulSoup(html_content)
@@ -63,19 +69,22 @@ def get_instant_view_links(items):
             response = telegraph.create_page(
                 item.get('title'),
                 author_name=item.get('feed')[0].get('title'),
-                html_content=unicode(soup)
+                html_content=unicode(soup),
+                author_url=item.get('link')
             )
-            links.append(u'http://telegra.ph/{}'.format(response['path']))
-        except Exception as e:
+            link = u'http://telegra.ph/{}'.format(response['path'])
+            links.append(link)
+            add_link(id, link)
+        except Exception:
             traceback.print_exc()
-            print html_content
+            print item
             continue
     return links
 
 
 def get_new_items(bot, job):
     user_id = job.context.get('user_id')
-    token = user_token_dict.get(user_id)
+    token = get_token(user_id)
     headers = get_auth_headers(token)
     request_url = URL + '/api/my/items'
 
@@ -128,7 +137,7 @@ def my(bot, update):
 def echo(bot, update):
     msg = update.message.text
     user_id = update.message.from_user.id
-    token = user_token_dict.get(user_id)
+    token = get_token(user_id)
     headers = get_auth_headers(token)
 
     if msg == 'feeds':
@@ -181,17 +190,49 @@ def help(bot, update):
 
 
 def add_token(bot, update, args):
+    if not args:
+        return
     token = args[0]
     user_id = update.message.from_user.id
-    user_token_dict[user_id] = token
+
+    # Insert a row of data
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO user VALUES (?,?)", (user_id, token))
+    conn.commit()
+
     text = emojize(":ok_hand:", use_aliases=True)
     bot.send_message(chat_id=update.message.chat_id, text=text)
+
+
+def get_token(id):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute("select token from user where id=?", (id, ))
+    result = c.fetchone()
+    return result[0] if result else None
+
+
+def add_link(id, link):
+    # Insert a row of data
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO item VALUES (?,?)", (id, link))
+    conn.commit()
+
+
+def get_link(id):
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute("select link from item where id=?", (id, ))
+    result = c.fetchone()
+    return result[0] if result else None
 
 
 def subscribe(bot, update, args):
     feedurl = args[0]
     user_id = update.message.from_user.id
-    token = user_token_dict.get(user_id)
+    token = get_token(user_id)
     payload = {"feedurl": feedurl}
     request_url = URL + '/api/my/subscribe'
     headers = get_auth_headers(token)
@@ -229,7 +270,7 @@ def callback(bot, update):
         return
 
     user_id = update.callback_query.from_user.id
-    token = user_token_dict.get(user_id)
+    token = get_token(user_id)
     headers = get_auth_headers(token)
     request_url = URL + '/api/my/items' + '?page=%s&per_page=10' % page
     r = requests.get(request_url, headers=headers)
@@ -282,37 +323,16 @@ def inline_caps(bot, update):
     bot.answer_inline_query(update.inline_query.id, results)
 
 
-# def get_access_token():
-#     r = requests.get(
-#         telegraph_url + 'createAccount?short_name=feedall&author_name=feedall')
-
-#     if r.status_code == 200:
-#         response = r.json()
-#         if response.get('ok'):
-#             return response.get('result').get('access_token')
-#     return None
-
-
-# ACCESS_TOKEN = get_access_token()
-
-
-# def create_page(datas):
-#     params = u'createPage?access_token={access_token}&title={title}&author_name={author_name}&content={content}'.format(
-#         access_token=ACCESS_TOKEN, **datas)
-#     r = requests.get(
-#         telegraph_url + params)
-#     print(telegraph_url + params)
-#     print(r)
-#     print(r.json())
-
-#     if r.status_code == 200:
-#         response = r.json()
-#         if response.get('ok'):
-#             return response.get('result').get('url')
-#     return None
-
-
 if __name__ == "__main__":
+    # Create table
+    conn = sqlite3.connect('bot.db')
+    c = conn.cursor()
+    c.execute(
+        '''CREATE TABLE if not exists user (id INTEGER PRIMARY KEY, token text)''')
+    c.execute(
+        '''CREATE TABLE if not exists item (id text PRIMARY KEY, link text)''')
+    conn.commit()
+    conn.close()
 
     dispatcher.add_handler(CommandHandler('start', start, pass_job_queue=True))
     dispatcher.add_handler(CommandHandler('help', help))
