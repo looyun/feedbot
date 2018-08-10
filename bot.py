@@ -3,6 +3,8 @@
 
 import json
 import logging
+import traceback
+from datetime import time
 from functools import partial
 
 import requests
@@ -12,10 +14,20 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
                       KeyboardButton, ReplyKeyboardMarkup)
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           InlineQueryHandler, MessageHandler, Updater)
+from telegraph import Telegraph
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    from BeautifulSoup import BeautifulSoup
+
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
+
+telegraph = Telegraph()
+telegraph.create_account(short_name='feedall', author_name='feedall')
 
 updater = Updater(token='533092604:AAGjcs5aOhjIvqM7-SJEuho2_64FsKhPXu0')
 dispatcher = updater.dispatcher
@@ -33,13 +45,69 @@ def get_auth_headers(token):
     return {"Authorization": token}
 
 
-def start(bot, update):
+def get_instant_view_links(items):
+    links = list()
+    for item in items:
+        html_content = item.get('content') or item.get('description')
+        try:
+            soup = BeautifulSoup(html_content)
+            h2s = soup.find_all('h2')
+            for h2 in h2s:
+                h2.name = 'h3'
+            spans = soup.find_all('span')
+            for span in spans:
+                span.unwrap()
+            divs = soup.find_all('div')
+            for div in divs:
+                div.unwrap()
+            response = telegraph.create_page(
+                item.get('title'),
+                author_name=item.get('feed')[0].get('title'),
+                html_content=unicode(soup)
+            )
+            links.append(u'http://telegra.ph/{}'.format(response['path']))
+        except Exception as e:
+            traceback.print_exc()
+            print html_content
+            continue
+    return links
+
+
+def get_new_items(bot, job):
+    user_id = job.context.get('user_id')
+    token = user_token_dict.get(user_id)
+    headers = get_auth_headers(token)
+    request_url = URL + '/api/my/items'
+
+    r = requests.get(request_url + '?page=1&per_page=10', headers=headers)
+
+    if r.status_code == 200:
+        items = r.json()
+        links = get_instant_view_links(items)
+        if len(links) == 0:
+            text = emojize("no data:slightly_frowning_face:", use_aliases=True)
+        else:
+            text = emojize('\n'.join(links) + "\n:ok_hand:", use_aliases=True)
+    else:
+        text = emojize("failed:slightly_frowning_face:", use_aliases=True)
+
+    bot.send_message(chat_id=job.context.get('chat_id'), text=text)
+
+
+def start(bot, update, job_queue):
 
     bot.send_message(
         chat_id=update.message.chat_id,
         text=emojize(
-            "Welcome! Try /list to get feed. :stuck_out_tongue_closed_eyes:",
-            use_aliases=True))
+            "Welcome! You will get 10 items every day. Try /my manage your feeds. :stuck_out_tongue_closed_eyes:",
+            use_aliases=True)
+    )
+    context = {'chat_id': update.message.chat_id,
+               'user_id': update.message.from_user.id}
+    t = time(9, 10, 0)
+    job_queue.run_daily(get_new_items, t, context=context)
+    # job_queue.run_repeating(get_new_items, interval=300,
+    #                         first=0, context=context)
 
 
 def status(bot, update):
@@ -95,10 +163,7 @@ def echo(bot, update):
 
     if r.status_code == 200:
         items = r.json()
-        links = list()
-        for item in items:
-            link = URL + '/api/item/' + str(item.get('_id'))
-            links.append(link)
+        links = get_instant_view_links(items)
         if len(links) == 0:
             text = emojize("no data:slightly_frowning_face:", use_aliases=True)
         else:
@@ -141,10 +206,7 @@ def subscribe(bot, update, args):
 def hot(bot, update):
     r = requests.get(URL + '/api/items/recommand/5')
     items = r.json()
-    links = list()
-    for item in items:
-        link = URL + '/api/item/' + item.get("link")
-        links.append(link)
+    links = get_instant_view_links(items)
     bot.send_message(chat_id=update.message.chat_id, text='\n'.join(links))
 
 
@@ -174,10 +236,7 @@ def callback(bot, update):
 
     if r.status_code == 200:
         items = r.json()
-        links = list()
-        for item in items:
-            link = URL + '/api/item/' + str(item.get('_id'))
-            links.append(link)
+        links = get_instant_view_links(items)
         if len(links) == 0:
             text = emojize("no data:slightly_frowning_face:", use_aliases=True)
         else:
@@ -223,9 +282,39 @@ def inline_caps(bot, update):
     bot.answer_inline_query(update.inline_query.id, results)
 
 
+# def get_access_token():
+#     r = requests.get(
+#         telegraph_url + 'createAccount?short_name=feedall&author_name=feedall')
+
+#     if r.status_code == 200:
+#         response = r.json()
+#         if response.get('ok'):
+#             return response.get('result').get('access_token')
+#     return None
+
+
+# ACCESS_TOKEN = get_access_token()
+
+
+# def create_page(datas):
+#     params = u'createPage?access_token={access_token}&title={title}&author_name={author_name}&content={content}'.format(
+#         access_token=ACCESS_TOKEN, **datas)
+#     r = requests.get(
+#         telegraph_url + params)
+#     print(telegraph_url + params)
+#     print(r)
+#     print(r.json())
+
+#     if r.status_code == 200:
+#         response = r.json()
+#         if response.get('ok'):
+#             return response.get('result').get('url')
+#     return None
+
+
 if __name__ == "__main__":
 
-    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CommandHandler('start', start, pass_job_queue=True))
     dispatcher.add_handler(CommandHandler('help', help))
     dispatcher.add_handler(CommandHandler('status', status))
     dispatcher.add_handler(CommandHandler('my', my))
