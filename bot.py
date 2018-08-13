@@ -15,7 +15,7 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
                       KeyboardButton, ReplyKeyboardMarkup)
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           InlineQueryHandler, MessageHandler, Updater)
-from telegraph import Telegraph
+from telegraph import Telegraph, TelegraphException
 
 try:
     from bs4 import BeautifulSoup
@@ -75,9 +75,11 @@ def get_instant_view_links(items):
             link = u'http://telegra.ph/{}'.format(response['path'])
             links.append(link)
             add_link(id, link)
+        except TelegraphException as e:
+            print e
+            print item.get('link')
         except Exception:
             traceback.print_exc()
-            print item
             continue
     return links
 
@@ -262,7 +264,6 @@ def import_feeds(bot, uodate):
 def callback(bot, update):
     query = update.callback_query
 
-    print(query.data)
     if query.data == 'current_page':
         return
     page = int(query.data)
@@ -286,11 +287,7 @@ def callback(bot, update):
         text = emojize("failed:slightly_frowning_face:", use_aliases=True)
 
     reply_markup = get_page_reply_markup(page)
-    bot.edit_message_text(
-        text=text,
-        chat_id=query.message.chat_id,
-        message_id=query.message.message_id, reply_markup=reply_markup)
-    print('finished')
+    query.edit_message_text(text=text, reply_markup=reply_markup)
     return
 
 
