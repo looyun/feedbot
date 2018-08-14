@@ -5,9 +5,10 @@ import json
 import logging
 import sqlite3
 import traceback
-from datetime import time
+from datetime import time, datetime, timedelta
 from functools import partial
 
+import pytz
 import requests
 from emoji import emojize
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
@@ -39,6 +40,8 @@ DOMAIN = ''
 PORT = 4000
 SCHEMA = 'http://'
 URL = SCHEMA + (DOMAIN or HOST) + ':' + str(PORT)
+
+tz = pytz.timezone('Asia/Shanghai')
 
 
 def get_auth_headers(token):
@@ -115,10 +118,10 @@ def start(bot, update, job_queue):
     )
     context = {'chat_id': update.message.chat_id,
                'user_id': update.message.from_user.id}
-    t = time(9, 10, 0)
-    job_queue.run_daily(get_new_items, t, context=context)
-    # job_queue.run_repeating(get_new_items, interval=300,
-    #                         first=0, context=context)
+    # t = time(10, 0, 0, tzinfo=tz)
+    # job_queue.run_daily(get_new_items, t, context=context)
+    job_queue.run_repeating(get_new_items, interval=timedelta(days=1),
+                            first=0, context=context)
 
 
 def status(bot, update):

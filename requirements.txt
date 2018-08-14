@@ -3,3 +3,4 @@ python-telegram-bot==10.1.0
 requests==2.19.1
 telegraph==1.3.0
 beautifulsoup4==4.6.1
+pytz==2017.2
