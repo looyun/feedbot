@@ -5,7 +5,7 @@ import json
 import logging
 import sqlite3
 import traceback
-from datetime import time, datetime, timedelta
+from datetime import datetime, time, timedelta
 from functools import partial
 
 import pytz
@@ -17,6 +17,7 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           InlineQueryHandler, MessageHandler, Updater)
 from telegraph import Telegraph, TelegraphException
+from telegraph.utils import NotAllowedTag
 
 try:
     from bs4 import BeautifulSoup
@@ -69,6 +70,12 @@ def get_instant_view_links(items):
             divs = soup.find_all('div')
             for div in divs:
                 div.unwrap()
+            divs = soup.find_all('dir')
+            for div in divs:
+                div.unwrap()
+            divs = soup.find_all('audio')
+            for div in divs:
+                div.extract()
             response = telegraph.create_page(
                 item.get('title'),
                 author_name=item.get('feed')[0].get('title'),
@@ -79,6 +86,9 @@ def get_instant_view_links(items):
             links.append(link)
             add_link(id, link)
         except TelegraphException as e:
+            print e
+            print item.get('link')
+        except NotAllowedTag as e:
             print e
             print item.get('link')
         except Exception:
